@@ -85,18 +85,49 @@ export default function ControlButtons({
           <span className="material-icons">grid_on</span>
         </button>
 
-        {/* Edit Mode temporarily disabled in native Three.js version */}
-        {/* <button 
+        <button 
           className={`control-button ${isEditMode ? 'active' : ''}`}
           onClick={onToggleEditMode}
-          title="Toggle Edit Mode"
+          title="Toggle Edit Mode - Click objects to select and transform"
           data-tooltip="Edit Mode"
         >
           <span className="material-icons">edit</span>
-        </button> */}
+        </button>
       </div>
 
-      {/* Note: Native Three.js version doesn't support gizmo controls */}
+      {/* Gizmo Controls - only show when in edit mode */}
+      {isEditMode && (
+        <div className="button-group gizmo-group">
+          <div className="group-separator"></div>
+          
+          <button
+            className={`control-button ${gizmoMode === 'translate' ? 'active' : ''}`}
+            onClick={() => setGizmoMode('translate')}
+            title="Translate Tool (Move) - W key"
+            data-tooltip="Move"
+          >
+            <span className="material-icons">open_with</span>
+          </button>
+          
+          <button
+            className={`control-button ${gizmoMode === 'rotate' ? 'active' : ''}`}
+            onClick={() => setGizmoMode('rotate')}
+            title="Rotate Tool - E key"
+            data-tooltip="Rotate"
+          >
+            <span className="material-icons">rotate_90_degrees_ccw</span>
+          </button>
+          
+          <button
+            className={`control-button ${gizmoMode === 'scale' ? 'active' : ''}`}
+            onClick={() => setGizmoMode('scale')}
+            title="Scale Tool (Resize) - R key"
+            data-tooltip="Scale"
+          >
+            <span className="material-icons">aspect_ratio</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

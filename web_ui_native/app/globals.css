@@ -885,6 +885,15 @@ body {
   margin: 0 8px;
 }
 
+.gizmo-group {
+  margin-left: 16px;
+}
+
+.gizmo-group .control-button.active {
+  background: #2a5ea4;
+  border-color: #2a5ea4;
+}
+
 .control-buttons .control-button {
   width: 48px;
   height: 48px;

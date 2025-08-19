@@ -16,7 +16,7 @@ import {
 } from '@/lib/three-utils'
 import type { BlenderMeshData, BlenderSceneData, BlenderObjectData, MeshInfo } from '@/types'
 
-export function useThreeScene() {
+export function useThreeScene(sendMessage?: (message: any) => boolean) {
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
@@ -34,6 +34,7 @@ export function useThreeScene() {
   const isEditModeRef = useRef<boolean>(false)
   const selectObjectRef = useRef<((mesh: THREE.Mesh) => void) | null>(null)
   const deselectObjectRef = useRef<(() => void) | null>(null)
+  const sendTransformRef = useRef<((mesh: THREE.Mesh) => void) | null>(null)
   
   const [isInitialized, setIsInitialized] = useState(false)
   const [meshInfo, setMeshInfo] = useState<MeshInfo>({ vertexCount: 0, faceCount: 0 })
@@ -42,6 +43,7 @@ export function useThreeScene() {
   const [isWireframe, setIsWireframe] = useState(false)
   const [showGrid, setShowGrid] = useState(true)
   const [isEditMode, setIsEditMode] = useState(false)
+  const [gizmoMode, setGizmoMode] = useState<'translate' | 'rotate' | 'scale'>('translate')
   
   // Auto-rotation is now handled by OrbitControls.autoRotate
   
@@ -107,13 +109,18 @@ export function useThreeScene() {
 
       // Initialize raycaster for object selection
       raycasterRef.current = new THREE.Raycaster()
+      raycasterRef.current.layers.enableAll() // Enable all layers for raycasting
       console.log('🏁 INIT: Raycaster initialized')
 
       // Import OrbitControls and TransformControls dynamically for client-side only
       Promise.all([
-      import('three/examples/jsm/controls/OrbitControls.js'),
-      import('three/examples/jsm/controls/TransformControls.js')
+      import('three/addons/controls/OrbitControls.js'),
+      import('three/addons/controls/TransformControls.js')
     ]).then(([{ OrbitControls }, { TransformControls }]) => {
+      console.log('🏁 INIT: Modules imported successfully')
+      console.log('🏁 INIT: OrbitControls:', OrbitControls)
+      console.log('🏁 INIT: TransformControls:', TransformControls)
+      
       const controls = new OrbitControls(camera, renderer.domElement)
       controls.enableDamping = true
       controls.dampingFactor = 0.05
@@ -125,7 +132,24 @@ export function useThreeScene() {
       console.log('🏁 INIT: Controls assigned asynchronously - controls:', !!controlsRef.current)
 
       // Initialize TransformControls
+      console.log('🏁 INIT: Creating TransformControls...')
+      console.log('🏁 INIT: TransformControls class:', TransformControls)
+      
       const transformControls = new TransformControls(camera, renderer.domElement)
+      console.log('🏁 INIT: TransformControls created:', transformControls)
+      console.log('🏁 INIT: TransformControls type:', typeof transformControls)
+      console.log('🏁 INIT: TransformControls isObject3D:', transformControls.isObject3D)
+      
+      // Set TransformControls properties for better visibility
+      transformControls.setSize(1.5) // Make gizmo larger for better visibility
+      transformControls.setSpace('world') // Use world space coordinates
+      
+      // Check if it's a valid Object3D before adding event listeners
+      if (!transformControls || typeof transformControls !== 'object') {
+        console.error('🚨 INIT: TransformControls is not a valid object!', transformControls)
+        return
+      }
+      
       transformControls.addEventListener('change', () => {
         // Force render when transform controls change
         if (renderer && scene && camera) {
@@ -137,15 +161,29 @@ export function useThreeScene() {
         controls.enabled = !event.value
         
         // Send transform data to Blender when dragging ends
-        if (!event.value && selectedObjectRef.current) {
-          sendTransformToBlender(selectedObjectRef.current)
+        if (!event.value && selectedObjectRef.current && sendTransformRef.current) {
+          console.log('🔧 TransformControls: Dragging ended, sending transform to Blender')
+          sendTransformRef.current(selectedObjectRef.current)
         }
       })
+      
+      // Set the mode to the current gizmo mode
+      transformControls.setMode('translate') // Default mode
+      
       transformControlsRef.current = transformControls
       
       // Add TransformControls to the scene so it can render
-      scene.add(transformControls)
-      console.log('TransformControls initialized and added to scene')
+      try {
+        console.log('🏁 INIT: Adding TransformControls to scene...')
+        scene.add(transformControls)
+        console.log('🏁 INIT: TransformControls successfully added to scene')
+      } catch (error) {
+        console.error('🚨 INIT: Failed to add TransformControls to scene:', error)
+        console.log('🚨 INIT: TransformControls object:', transformControls)
+        console.log('🚨 INIT: Scene object:', scene)
+      }
+    }).catch((error) => {
+      console.error('🚨 INIT: Failed to import controls:', error)
     })
 
     // Start animation loop
@@ -188,40 +226,45 @@ export function useThreeScene() {
 
     // Handle keyboard shortcuts for transform modes
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isEditMode || !transformControlsRef.current) return
+      if (!isEditModeRef.current || !transformControlsRef.current) return
 
       switch (event.key.toLowerCase()) {
         case 'w':
           transformControlsRef.current.setMode('translate')
-          console.log('Transform mode: Translate')
+          setGizmoMode('translate')
+          console.log('🔧 Transform mode: Translate')
           break
         case 'e':
           transformControlsRef.current.setMode('rotate')
-          console.log('Transform mode: Rotate')
+          setGizmoMode('rotate')
+          console.log('🔧 Transform mode: Rotate')
           break
         case 'r':
           transformControlsRef.current.setMode('scale')
-          console.log('Transform mode: Scale')
+          setGizmoMode('scale')
+          console.log('🔧 Transform mode: Scale')
           break
         case 'q':
           const currentSpace = transformControlsRef.current.space
           transformControlsRef.current.setSpace(currentSpace === 'local' ? 'world' : 'local')
-          console.log(`Transform space: ${transformControlsRef.current.space}`)
+          console.log(`🔧 Transform space: ${transformControlsRef.current.space}`)
           break
         case 'escape':
-          deselectObject()
+          if (deselectObjectRef.current) {
+            deselectObjectRef.current()
+          }
           break
         case ' ':
           event.preventDefault()
           transformControlsRef.current.enabled = !transformControlsRef.current.enabled
-          console.log(`Transform controls: ${transformControlsRef.current.enabled ? 'Enabled' : 'Disabled'}`)
+          console.log(`🔧 Transform controls: ${transformControlsRef.current.enabled ? 'Enabled' : 'Disabled'}`)
           break
       }
     }
 
     // Handle mouse move for hover highlighting
     const handleMouseMove = (event: MouseEvent) => {
-      if (!isEditMode) return
+      if (!isEditModeRef.current) return
       
       const rect = container.getBoundingClientRect()
       pointerRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
@@ -233,17 +276,17 @@ export function useThreeScene() {
     container.addEventListener('mousemove', handleMouseMove)
 
     // Add a test cube for debugging selection
-    const debugCubeGeometry = new THREE.BoxGeometry(1, 1, 1)
+    const debugCubeGeometry = new THREE.BoxGeometry(2, 2, 2) // Make it larger for easier selection
     debugCubeGeometry.computeBoundingBox()
     debugCubeGeometry.computeBoundingSphere()
     const debugCubeMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000, wireframe: false })
     const debugCube = new THREE.Mesh(debugCubeGeometry, debugCubeMaterial)
-    debugCube.position.set(3, 0, 0) // Position it to the right of the origin
+    debugCube.position.set(0, 1, 0) // Position it above the origin for easier visibility
     debugCube.name = 'DebugCube'
     debugCube.userData = { selectable: true, blenderName: 'DebugCube', isTestObject: true }
     debugCube.userData.originalEmissive = debugCubeMaterial.emissive.getHex()
     scene.add(debugCube)
-    console.log('🧪 TEST: Added debug cube for selection debugging')
+    console.log('🧪 TEST: Added debug cube for selection debugging at (0,1,0)')
 
       setIsInitialized(true)
       console.log('🏁 INIT: Scene initialization completed successfully')
@@ -265,19 +308,18 @@ export function useThreeScene() {
 
     return () => {
       console.log('🧹 CLEANUP: Scene cleanup called - this should only happen on unmount!')
-      window.removeEventListener('resize', handleResize)
-      window.removeEventListener('keydown', handleKeyDown)
-      container.removeEventListener('mousemove', handleMouseMove)
       if (animationIdRef.current) {
         console.log('🧹 CLEANUP: Cancelling animation frame')
         cancelAnimationFrame(animationIdRef.current)
       }
-      if (renderer && container.contains(renderer.domElement)) {
+      if (rendererRef.current && container.contains(rendererRef.current.domElement)) {
         console.log('🧹 CLEANUP: Removing renderer from DOM')
-        container.removeChild(renderer.domElement)
+        container.removeChild(rendererRef.current.domElement)
       }
-      console.log('🧹 CLEANUP: Disposing renderer')
-      renderer.dispose()
+      if (rendererRef.current) {
+        console.log('🧹 CLEANUP: Disposing renderer')
+        rendererRef.current.dispose()
+      }
     }
   }, [])
 
@@ -687,8 +729,9 @@ export function useThreeScene() {
       mesh.userData = { selectable: true, blenderName: 'LegacyMesh' }
       
       // Store original material color for hover highlighting
-      if (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshPhysicalMaterial) {
-        mesh.userData.originalEmissive = material.emissive.getHex()
+      const mat = material as THREE.Material
+      if (mat instanceof THREE.MeshStandardMaterial || mat instanceof THREE.MeshPhysicalMaterial) {
+        mesh.userData.originalEmissive = mat.emissive.getHex()
       }
       
       meshRef.current = mesh
@@ -890,17 +933,17 @@ export function useThreeScene() {
       if (mesh.material) {
         if (Array.isArray(mesh.material)) {
           mesh.material.forEach((mat, matIndex) => {
-            if (mat.wireframe !== undefined) {
+            if ('wireframe' in mat) {
               console.log(`🔧 toggleWireframe: Setting wireframe on material ${matIndex} to:`, newWireframe)
-              mat.wireframe = newWireframe
+              ;(mat as any).wireframe = newWireframe
             } else {
               console.log(`🔧 toggleWireframe: Material ${matIndex} doesn't support wireframe`)
             }
           })
         } else {
-          if (mesh.material.wireframe !== undefined) {
+          if ('wireframe' in mesh.material) {
             console.log(`🔧 toggleWireframe: Setting wireframe on single material to:`, newWireframe)
-            mesh.material.wireframe = newWireframe
+            ;(mesh.material as any).wireframe = newWireframe
           } else {
             console.log(`🔧 toggleWireframe: Material doesn't support wireframe`)
           }
@@ -919,7 +962,7 @@ export function useThreeScene() {
     
     if (controlsRef.current) {
       const newValue = !isAutoRotating
-      controlsRef.current.autoRotate = newValue
+      ;(controlsRef.current as any).autoRotate = newValue
       console.log('🔧 toggleAutoRotate: Set controls.autoRotate to:', newValue)
       setIsAutoRotating(newValue)
     } else {
@@ -952,10 +995,32 @@ export function useThreeScene() {
     setIsEditMode(newEditMode)
     isEditModeRef.current = newEditMode
     
+    // When entering edit mode, set transform controls to current gizmo mode
+    if (newEditMode && transformControlsRef.current) {
+      transformControlsRef.current.setMode(gizmoMode)
+      console.log(`🔧 toggleEditMode: Set transform mode to ${gizmoMode}`)
+    }
+    
     // When exiting edit mode, deselect any selected object
-    if (!newEditMode && selectedObjectRef.current) {
+    if (!newEditMode && selectedObjectRef.current && transformControlsRef.current) {
+      // Restore original color and detach transform controls
       restoreOriginalEmissive(selectedObjectRef.current)
+      transformControlsRef.current.detach()
       selectedObjectRef.current = null
+      console.log('🔧 toggleEditMode: Deselected object and detached transform controls')
+    }
+    
+    console.log(`🔧 Edit mode: ${newEditMode ? 'ON - Click objects to select and transform' : 'OFF'}`)
+  }, [isEditMode, gizmoMode])
+
+  const setGizmoModeAndUpdate = useCallback((mode: 'translate' | 'rotate' | 'scale') => {
+    console.log('🔧 setGizmoModeAndUpdate:', mode)
+    setGizmoMode(mode)
+    
+    // Update transform controls if available and in edit mode
+    if (transformControlsRef.current && isEditMode) {
+      transformControlsRef.current.setMode(mode)
+      console.log(`🔧 setGizmoModeAndUpdate: Updated transform controls to ${mode}`)
     }
   }, [isEditMode])
 
@@ -985,6 +1050,52 @@ export function useThreeScene() {
     }
   }, [])
 
+  const sendTransformToBlender = useCallback(async (mesh: THREE.Mesh) => {
+    if (!sendMessage) {
+      console.warn('🔧 sendTransformToBlender: No sendMessage function available')
+      return
+    }
+    
+    try {
+      // Convert Three.js transform back to Blender coordinate system
+      const threePosition = mesh.position
+      const threeQuaternion = mesh.quaternion
+      const threeScale = mesh.scale
+
+      // Convert position back to Blender coordinates using inverse getBasisTransform
+      const threeToBlenderMatrix = new THREE.Matrix4()
+      getBasisTransform('+X+Z+Y', '+X+Y+Z', threeToBlenderMatrix)
+      
+      const blenderPosition = threePosition.clone().applyMatrix4(threeToBlenderMatrix)
+
+      // Create transform matrix in Blender format
+      const transformMatrix = new THREE.Matrix4()
+      transformMatrix.compose(blenderPosition, threeQuaternion, threeScale)
+
+      const transformData = {
+        type: 'transform_update',
+        objectName: mesh.name || 'Unknown',
+        transform: transformMatrix.toArray(),
+        position: [blenderPosition.x, blenderPosition.y, blenderPosition.z],
+        rotation: [threeQuaternion.x, threeQuaternion.y, threeQuaternion.z, threeQuaternion.w],
+        scale: [threeScale.x, threeScale.y, threeScale.z],
+        timestamp: Date.now()
+      }
+
+      console.log('🔧 sendTransformToBlender: Sending transform to Blender:', transformData)
+      const success = sendMessage(transformData)
+      
+      if (success) {
+        console.log('🔧 sendTransformToBlender: Successfully sent transform to Blender')
+      } else {
+        console.warn('🔧 sendTransformToBlender: Failed to send transform to Blender')
+      }
+      
+    } catch (error) {
+      console.error('🔧 sendTransformToBlender: Error sending transform to Blender:', error)
+    }
+  }, [sendMessage])
+
   const selectObject = useCallback((mesh: THREE.Mesh) => {
     if (transformControlsRef.current) {
       // Restore previous selected object
@@ -998,7 +1109,7 @@ export function useThreeScene() {
       // Highlight selected object with bright color
       setEmissiveHighlight(mesh, 0x00ff00) // Bright green highlight - very visible on red cube
       
-      console.log(`Selected object: ${mesh.name || 'Unnamed'}`)
+      console.log(`🔧 selectObject: Selected object: ${mesh.name || 'Unnamed'}`)
     }
   }, [setEmissiveHighlight, restoreOriginalEmissive])
 
@@ -1024,43 +1135,10 @@ export function useThreeScene() {
   useEffect(() => {
     deselectObjectRef.current = deselectObject
   }, [deselectObject])
-
-
-  const sendTransformToBlender = useCallback(async (mesh: THREE.Mesh) => {
-    try {
-      // Convert Three.js transform back to Blender coordinate system
-      const threePosition = mesh.position
-      const threeQuaternion = mesh.quaternion
-      const threeScale = mesh.scale
-
-      // Convert position back to Blender coordinates using inverse getBasisTransform
-      const threeToBlenderMatrix = new THREE.Matrix4()
-      getBasisTransform('+X+Z+Y', '+X+Y+Z', threeToBlenderMatrix)
-      
-      const blenderPosition = threePosition.clone().applyMatrix4(threeToBlenderMatrix)
-
-      // Create transform matrix in Blender format
-      const transformMatrix = new THREE.Matrix4()
-      transformMatrix.compose(blenderPosition, threeQuaternion, threeScale)
-
-      const transformData = {
-        type: 'transform_update',
-        objectName: mesh.name || 'Unknown',
-        transform: transformMatrix.toArray(),
-        position: [blenderPosition.x, blenderPosition.y, blenderPosition.z],
-        rotation: [threeQuaternion.x, threeQuaternion.y, threeQuaternion.z, threeQuaternion.w],
-        scale: [threeScale.x, threeScale.y, threeScale.z]
-      }
-
-      console.log('Sending transform to Blender:', transformData)
-
-      // Send to WebSocket (assuming you have access to the WebSocket connection)
-      // You might need to pass the WebSocket send function as a prop or use a context
-      
-    } catch (error) {
-      console.error('Error sending transform to Blender:', error)
-    }
-  }, [])
+  
+  useEffect(() => {
+    sendTransformRef.current = sendTransformToBlender
+  }, [sendTransformToBlender])
 
   const handleHoverHighlight = useCallback(() => {
     if (!raycasterRef.current || !cameraRef.current || !sceneRef.current) return
@@ -1135,7 +1213,7 @@ export function useThreeScene() {
 
     const handleMouseClick = (event: MouseEvent) => {
       // Only process clicks in edit mode
-      if (!isEditMode) {
+      if (!isEditModeRef.current) {
         console.log('🔧 MAIN: Click ignored - not in edit mode')
         return
       }
@@ -1179,10 +1257,14 @@ export function useThreeScene() {
       if (intersects.length > 0) {
         const selectedMesh = intersects[0].object as THREE.Mesh
         console.log('🔧 MAIN: Selected:', selectedMesh.name)
-        selectObject(selectedMesh)
+        if (selectObjectRef.current) {
+          selectObjectRef.current(selectedMesh)
+        }
       } else {
         console.log('🔧 MAIN: No intersections, deselecting')
-        deselectObject()
+        if (deselectObjectRef.current) {
+          deselectObjectRef.current()
+        }
       }
     }
 
@@ -1195,7 +1277,7 @@ export function useThreeScene() {
       canvas.removeEventListener('click', handleMouseClick)
       console.log('🔧 MAIN: Click listener removed')
     }
-  }, [isEditMode, selectObject, deselectObject]) // Include dependencies for access to current values
+  }, []) // Using refs instead of functions to avoid stale closures
 
   useEffect(() => {
     return cleanup
@@ -1217,6 +1299,8 @@ export function useThreeScene() {
     isAutoRotating,
     isWireframe,
     showGrid,
-    isEditMode
+    isEditMode,
+    gizmoMode,
+    setGizmoMode: setGizmoModeAndUpdate
   }
 }

@@ -1,3 +1,5 @@
+// inspired by 
+
 const WebSocket = require('ws');
 const net = require('net');
 const zlib = require('zlib');

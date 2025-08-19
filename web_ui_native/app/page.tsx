@@ -40,14 +40,14 @@ export default function Home() {
     isAutoRotating,
     isWireframe,
     showGrid,
-    isEditMode
-  } = useThreeScene()
+    isEditMode,
+    gizmoMode,
+    setGizmoMode
+  } = useThreeScene(sendMessage)
 
   // Native Three.js doesn't support these advanced features - use defaults
   const autoRotateSpeed = 1
   const setAutoRotateSpeed = () => {}
-  const gizmoMode = 'translate' as const
-  const setGizmoMode = () => {}
   const updateFrequency = 30
   const setUpdateFrequency = () => {}
   const smoothReceiving = false
