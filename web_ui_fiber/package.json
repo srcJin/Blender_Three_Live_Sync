@@ -1,0 +1,32 @@
+{
+  "name": "blender-web-sync-client",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 9876",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@radix-ui/react-tooltip": "^1.2.7",
+    "@react-three/drei": "^10.5.1",
+    "@react-three/fiber": "^9.2.0",
+    "@types/three": "^0.178.0",
+    "clsx": "^2.1.1",
+    "next": "^15.3.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^3.3.1",
+    "three": "^0.178.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "^15.3.5",
+    "typescript": "^5.6.0"
+  }
+}

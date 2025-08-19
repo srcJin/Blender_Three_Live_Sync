@@ -1,0 +1,16 @@
+{
+  "name": "blender-web-sync-server",
+  "version": "1.0.0",
+  "description": "WebSocket server for Blender Web Live Sync",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "keywords": ["blender", "websocket", "3d", "sync"],
+  "author": "Blender Web Sync Team",
+  "license": "MIT"
+}

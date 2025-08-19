@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js Test - Grid & Axes</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #1e1e1e;
+            overflow: hidden;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-family: Arial, sans-serif;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>Three.js Grid & Axes Test</h3>
+        <p>You should see:</p>
+        <ul>
+            <li>Grid lines (10x10)</li>
+            <li>Colored axes (X=red, Y=green, Z=blue)</li>
+            <li>Camera at position (7, 5, 7)</li>
+        </ul>
+        <p>Use mouse to orbit around the scene</p>
+    </div>
+    
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x1e1e1e);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // Camera positioning (same as Next.js app)
+        camera.position.set(7, 5, 7);
+        camera.lookAt(0, 0, 0);
+
+        // Add orbit controls
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.screenSpacePanning = true;
+
+        // Add lights (same as Next.js app)
+        const light1 = new THREE.DirectionalLight(0xffffff, 0.8);
+        light1.position.set(1, 1, 1);
+        scene.add(light1);
+
+        const light2 = new THREE.DirectionalLight(0xffffff, 0.5);
+        light2.position.set(-1, -1, -1);
+        scene.add(light2);
+
+        scene.add(new THREE.AmbientLight(0x404040));
+
+        // Add grid helper (10x10)
+        const gridHelper = new THREE.GridHelper(10, 10);
+        scene.add(gridHelper);
+
+        // Add axes helper (5 units long)
+        const axesHelper = new THREE.AxesHelper(5);
+        scene.add(axesHelper);
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start animation
+        animate();
+        
+        console.log('Three.js scene initialized with grid and axes');
+    </script>
+</body>
+</html>
